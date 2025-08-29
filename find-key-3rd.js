@@ -42,7 +42,14 @@ const main = async () => {
   );
 
   // --- File Reading and Parsing ---
-  const checksums = await parseChecksumFile(reportPath);
+  const processedChecksums = await readExistingChecksums(processedLogPath);
+  const failedChecksums = await readExistingChecksums(failedLogPath);
+  const existingChecksums = new Set([
+    ...processedChecksums,
+    ...failedChecksums,
+  ]);
+
+  const checksums = await parseChecksumFile(reportPath, existingChecksums);
   const totalChecksums = checksums.length;
 
   if (totalChecksums === 0) {
@@ -159,11 +166,37 @@ const submitChecksum = async (checksum) => {
 };
 
 /**
+ * Reads a file containing previously processed or failed checksums.
+ * @param {string} filePath - The path to the checksums file.
+ * @returns {Promise<Set<string>>} A promise that resolves with a set of checksums.
+ */
+function readExistingChecksums(filePath) {
+  return new Promise((resolve, reject) => {
+    if (!fs.existsSync(filePath)) {
+      return resolve(new Set());
+    }
+    const checksums = new Set();
+    const stream = fs.createReadStream(filePath);
+    const rl = readline.createInterface({
+      input: stream,
+      crlfDelay: Infinity,
+    });
+
+    rl.on("line", (line) => {
+      checksums.add(line.trim());
+    });
+
+    rl.on("close", () => resolve(checksums));
+    rl.on("error", reject);
+  });
+}
+
+/**
  * Reads the checksum report file line by line.
  * @param {string} filePath - The path to the checksum file.
  * @returns {Promise<string[]>} A promise that resolves with an array of checksums.
  */
-function parseChecksumFile(filePath) {
+function parseChecksumFile(filePath, existingChecksums = new Set()) {
   return new Promise((resolve, reject) => {
     if (!fs.existsSync(filePath)) {
       return reject(new Error(`File not found: ${filePath}`));
@@ -180,7 +213,9 @@ function parseChecksumFile(filePath) {
       // Assumes format is "filepath,checksum" and takes the second part.
       if (parts.length === 2 && parts[1]) {
         const checksum = parts[1].trim();
-        checksums.push(checksum);
+        if (!existingChecksums.has(checksum)) {
+          checksums.push(checksum);
+        }
       }
     });
 
