@@ -128,7 +128,7 @@ const main = async () => {
 function updateProgress(processed, total) {
   const percentage = ((processed / total) * 100).toFixed(2);
   process.stdout.write(
-    `\rProgress: ${processed}/${total} checksums checked (${percentage}%)`
+    `\nProgress: ${processed}/${total} checksums checked (${percentage}%)`
   );
 }
 
